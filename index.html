@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenBoard - Personal Productivity Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <canvas id="particle-canvas"></canvas>
+
+    <div class="dashboard">
+        <header class="header">
+            <h1 class="logo">ZenBoard</h1>
+            <div class="theme-switcher">
+                <button class="theme-btn active" data-theme="focus" title="Focus Mode">
+                    <span class="theme-icon">🎯</span>
+                </button>
+                <button class="theme-btn" data-theme="chill" title="Chill Mode">
+                    <span class="theme-icon">🌙</span>
+                </button>
+                <button class="theme-btn" data-theme="energy" title="Energy Mode">
+                    <span class="theme-icon">⚡</span>
+                </button>
+                <button class="theme-btn" data-theme="dark" title="Dark Mode">
+                    <span class="theme-icon">🌑</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="widgets-grid">
+            <!-- Live Clock Widget -->
+            <div class="widget clock-widget">
+                <div class="widget-header">
+                    <h2>Time</h2>
+                </div>
+                <div class="clock-display">
+                    <div class="time-digits">
+                        <span class="digit hours" id="clock-hours">00</span>
+                        <span class="digit-separator">:</span>
+                        <span class="digit minutes" id="clock-minutes">00</span>
+                        <span class="digit-separator">:</span>
+                        <span class="digit seconds" id="clock-seconds">00</span>
+                    </div>
+                    <div class="date-display" id="clock-date"></div>
+                </div>
+            </div>
+
+            <!-- Pomodoro Timer Widget -->
+            <div class="widget pomodoro-widget">
+                <div class="widget-header">
+                    <h2>Pomodoro</h2>
+                    <button class="icon-btn focus-toggle-btn" id="focus-toggle" title="Toggle Focus Mode">
+                        <span class="icon">🎯</span>
+                    </button>
+                </div>
+                <div class="timer-container">
+                    <div class="breathing-circle">
+                        <svg class="timer-ring" viewBox="0 0 120 120">
+                            <circle class="ring-background" cx="60" cy="60" r="52"></circle>
+                            <circle class="ring-progress" cx="60" cy="60" r="52" id="timer-progress"></circle>
+                        </svg>
+                        <div class="timer-display">
+                            <span class="timer-mode" id="timer-mode">Work</span>
+                            <span class="timer-time" id="timer-time">25:00</span>
+                        </div>
+                    </div>
+                    <div class="timer-controls">
+                        <button class="control-btn" id="timer-start-pause">
+                            <span class="btn-icon play-icon">▶</span>
+                            <span class="btn-icon pause-icon">⏸</span>
+                        </button>
+                        <button class="control-btn" id="timer-reset">
+                            <span class="btn-icon">↻</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Notes Widget -->
+            <div class="widget notes-widget">
+                <div class="widget-header">
+                    <h2>Notes</h2>
+                    <button class="add-btn" id="add-note-btn" title="Add Note (N)">+</button>
+                </div>
+                <div class="notes-container" id="notes-container">
+                    <!-- Notes will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Todo List Widget -->
+            <div class="widget todo-widget">
+                <div class="widget-header">
+                    <h2>Tasks</h2>
+                </div>
+                <div class="todo-input-container">
+                    <input type="text" class="todo-input" id="todo-input" placeholder="Add a task... (Enter to add)">
+                    <select class="priority-select" id="priority-select">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <ul class="todo-list" id="todo-list">
+                    <!-- Todos will be dynamically inserted here -->
+                </ul>
+            </div>
+
+            <!-- Daily Goals Widget -->
+            <div class="widget goals-widget">
+                <div class="widget-header">
+                    <h2>Daily Goals</h2>
+                </div>
+                <div class="goals-container" id="goals-container">
+                    <!-- Goals will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="focus-overlay" id="focus-overlay">
+        <div class="focus-message">
+            <span class="focus-icon">🎯</span>
+            <p>Focus Mode Active</p>
+            <p class="focus-hint">Press F to exit</p>
+        </div>
+    </div>
+
+    <script src="canvas.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
