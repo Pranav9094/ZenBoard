@@ -1,6 +1,6 @@
 /**
- * ZenBoard Application Logic
- * Main application controller for all widgets and features
+ * ZenBoard Application Logic - Enhanced
+ * Main application controller with advanced features and animations
  */
 
 (function() {
@@ -12,7 +12,9 @@
   const STORAGE_KEYS = {
     NOTES: 'zb_notes',
     TODOS: 'zb_todos',
-    GOALS: 'zb_goals'
+    GOALS: 'zb_goals',
+    STATS: 'zb_stats',
+    SETTINGS: 'zb_settings'
   };
 
   // ============================================
@@ -24,8 +26,18 @@
     'rgba(0, 206, 201, 0.25)',
     'rgba(253, 121, 168, 0.25)',
     'rgba(253, 203, 110, 0.25)',
-    'rgba(0, 184, 148, 0.25)'
+    'rgba(0, 184, 148, 0.25)',
+    'rgba(231, 76, 60, 0.2)',
+    'rgba(155, 89, 182, 0.25)'
   ];
+
+  // Theme configurations with hue values for particles
+  const THEME_CONFIG = {
+    focus: { hue: 260, speed: 1.2, name: 'Focus' },
+    chill: { hue: 175, speed: 0.6, name: 'Chill' },
+    energy: { hue: 340, speed: 1.8, name: 'Energy' },
+    dark: { hue: 200, speed: 0.8, name: 'Dark' }
+  };
 
   // ============================================
   // DOM Elements Cache
@@ -44,11 +56,21 @@
       timeRemaining: 25 * 60,
       isRunning: false,
       workDuration: 25 * 60,
-      breakDuration: 5 * 60
+      breakDuration: 5 * 60,
+      completedCycles: 0
     },
     focusMode: false,
-    currentTheme: 'focus'
+    currentTheme: 'focus',
+    stats: {
+      totalTasksCompleted: 0,
+      totalFocusTime: 0,
+      sessionsToday: 0,
+      lastSessionDate: new Date().toDateString()
+    }
   };
+
+  // Timer interval reference
+  let timerInterval = null;
 
   // ============================================
   // Utility Functions
@@ -86,6 +108,61 @@
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  // Play success sound
+  function playSuccessSound() {
+    initAudio();
+    const now = audioContext.currentTime;
+
+    // Play a pleasant ascending chime
+    [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = freq;
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.2, now + i * 0.1);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.3);
+
+      oscillator.start(now + i * 0.1);
+      oscillator.stop(now + i * 0.1 + 0.3);
+    });
+  }
+
+  // ============================================
+  // Audio Context
+  // ============================================
+  let audioContext = null;
+
+  function initAudio() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  // Play timer complete beep
+  function playBeep() {
+    initAudio();
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+  }
+
   // ============================================
   // Clock Widget
   // ============================================
@@ -107,27 +184,29 @@
     const newMinutes = minutes.toString().padStart(2, '0');
     const newSeconds = seconds.toString().padStart(2, '0');
 
-    if (hoursEl.textContent !== newHours) {
+    if (hoursEl && hoursEl.textContent !== newHours) {
       hoursEl.textContent = newHours;
       hoursEl.classList.add('flip');
-      setTimeout(() => hoursEl.classList.remove('flip'), 300);
+      setTimeout(() => hoursEl.classList.remove('flip'), 400);
     }
 
-    if (minutesEl.textContent !== newMinutes) {
+    if (minutesEl && minutesEl.textContent !== newMinutes) {
       minutesEl.textContent = newMinutes;
       minutesEl.classList.add('flip');
-      setTimeout(() => minutesEl.classList.remove('flip'), 300);
+      setTimeout(() => minutesEl.classList.remove('flip'), 400);
     }
 
-    if (secondsEl.textContent !== newSeconds) {
+    if (secondsEl && secondsEl.textContent !== newSeconds) {
       secondsEl.textContent = newSeconds;
       secondsEl.classList.add('flip');
-      setTimeout(() => secondsEl.classList.remove('flip'), 300);
+      setTimeout(() => secondsEl.classList.remove('flip'), 400);
     }
 
-    // Update date
-    const options = { weekday: 'long', month: 'long', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
+    // Update date with animation
+    if (dateEl) {
+      const options = { weekday: 'long', month: 'long', day: 'numeric' };
+      dateEl.textContent = now.toLocaleDateString('en-US', options);
+    }
   }
 
   // Initialize clock
@@ -140,36 +219,6 @@
   // Pomodoro Timer Widget
   // ============================================
 
-  // Audio context for beep sound
-  let audioContext = null;
-
-  // Initialize audio context
-  function initAudio() {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-  }
-
-  // Play beep sound
-  function playBeep() {
-    initAudio();
-
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
-  }
-
   // Update timer display
   function updateTimerDisplay() {
     const timeEl = document.getElementById('timer-time');
@@ -177,6 +226,8 @@
     const progressEl = document.getElementById('timer-progress');
     const startPauseBtn = document.getElementById('timer-start-pause');
     const breathingCircle = document.querySelector('.breathing-circle');
+
+    if (!timeEl || !modeEl || !progressEl) return;
 
     timeEl.textContent = formatTime(state.timer.timeRemaining);
     modeEl.textContent = state.timer.mode === 'work' ? 'Work' : 'Break';
@@ -191,12 +242,14 @@
     progressEl.style.strokeDashoffset = offset;
 
     // Update button state
-    if (state.timer.isRunning) {
-      startPauseBtn.classList.add('running');
-      breathingCircle.classList.add('breathing');
-    } else {
-      startPauseBtn.classList.remove('running');
-      breathingCircle.classList.remove('breathing');
+    if (startPauseBtn) {
+      if (state.timer.isRunning) {
+        startPauseBtn.classList.add('running');
+        if (breathingCircle) breathingCircle.classList.add('breathing');
+      } else {
+        startPauseBtn.classList.remove('running');
+        if (breathingCircle) breathingCircle.classList.remove('breathing');
+      }
     }
   }
 
@@ -206,6 +259,11 @@
 
     state.timer.timeRemaining--;
 
+    // Update stats
+    if (state.timer.mode === 'work') {
+      state.stats.totalFocusTime++;
+    }
+
     if (state.timer.timeRemaining <= 0) {
       // Timer complete
       playBeep();
@@ -214,10 +272,17 @@
       if (state.timer.mode === 'work') {
         state.timer.mode = 'break';
         state.timer.timeRemaining = state.timer.breakDuration;
+        state.timer.completedCycles++;
+        state.stats.sessionsToday++;
+        playSuccessSound();
+        showNotification('Work session complete! Time for a break.');
       } else {
         state.timer.mode = 'work';
         state.timer.timeRemaining = state.timer.workDuration;
+        showNotification('Break over! Ready to focus?');
       }
+
+      saveStats();
     }
 
     updateTimerDisplay();
@@ -230,7 +295,17 @@
     if (state.timer.isRunning) {
       // Initialize audio on user interaction
       initAudio();
-      setInterval(timerTick, 1000);
+
+      // Clear any existing interval
+      if (timerInterval) clearInterval(timerInterval);
+
+      // Start new interval
+      timerInterval = setInterval(timerTick, 1000);
+    } else {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
     }
 
     updateTimerDisplay();
@@ -238,6 +313,11 @@
 
   // Reset timer
   function resetTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
     state.timer.isRunning = false;
     state.timer.timeRemaining = state.timer.mode === 'work'
       ? state.timer.workDuration
@@ -249,14 +329,21 @@
   function initTimer() {
     updateTimerDisplay();
 
-    document.getElementById('timer-start-pause').addEventListener('click', toggleTimer);
-    document.getElementById('timer-reset').addEventListener('click', resetTimer);
+    const startPauseBtn = document.getElementById('timer-start-pause');
+    const resetBtn = document.getElementById('timer-reset');
+
+    if (startPauseBtn) startPauseBtn.addEventListener('click', toggleTimer);
+    if (resetBtn) resetBtn.addEventListener('click', resetTimer);
   }
 
   // Pause timer (for keyboard shortcut)
   function pauseTimer() {
     if (state.timer.isRunning) {
       state.timer.isRunning = false;
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
       updateTimerDisplay();
     }
   }
@@ -265,8 +352,92 @@
   function resumeTimer() {
     if (!state.timer.isRunning && state.timer.timeRemaining > 0) {
       state.timer.isRunning = true;
+      timerInterval = setInterval(timerTick, 1000);
       updateTimerDisplay();
     }
+  }
+
+  // ============================================
+  // Notification System
+  // ============================================
+
+  // Show notification toast
+  function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.notification-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `notification-toast ${type}`;
+    toast.innerHTML = `
+      <span class="notification-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+      <span class="notification-message">${message}</span>
+    `;
+
+    // Add styles dynamically
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 2000;
+      box-shadow: 0 8px 32px var(--card-shadow);
+      animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      max-width: 350px;
+    `;
+
+    document.body.appendChild(toast);
+
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.4s ease forwards';
+      setTimeout(() => toast.remove(), 400);
+    }, 4000);
+  }
+
+  // Add notification styles to document
+  function addNotificationStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+      .notification-toast.success {
+        border-left: 3px solid var(--success-color);
+      }
+      .notification-toast.error {
+        border-left: 3px solid var(--danger-color);
+      }
+      .notification-toast.info {
+        border-left: 3px solid var(--accent-color);
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   // ============================================
@@ -293,6 +464,9 @@
       const colorBtn = document.createElement('button');
       colorBtn.className = 'note-color-btn';
       colorBtn.style.backgroundColor = color;
+      colorBtn.style.border = color === 'rgba(255, 255, 255, 0.1)'
+        ? '2px solid rgba(255,255,255,0.5)'
+        : '2px solid transparent';
       colorBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         updateNoteColor(note.id, color);
@@ -321,6 +495,9 @@
       updateNoteContent(note.id, contentEl.textContent);
     });
 
+    // Add enter animation
+    noteEl.style.animationDelay = `${state.notes.indexOf(note) * 0.05}s`;
+
     return noteEl;
   }
 
@@ -328,6 +505,7 @@
   function makeDraggable(noteEl) {
     let isDragging = false;
     let startX, startY, initialX, initialY;
+    let rect;
 
     noteEl.addEventListener('mousedown', (e) => {
       if (e.target.classList.contains('note-content') ||
@@ -342,7 +520,7 @@
       startX = e.clientX;
       startY = e.clientY;
 
-      const rect = noteEl.getBoundingClientRect();
+      rect = noteEl.getBoundingClientRect();
       initialX = rect.left;
       initialY = rect.top;
 
@@ -355,10 +533,11 @@
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
 
-      noteEl.style.position = 'absolute';
+      noteEl.style.position = 'fixed';
       noteEl.style.left = `${initialX + dx}px`;
       noteEl.style.top = `${initialY + dy}px`;
       noteEl.style.width = `${rect.width}px`;
+      noteEl.style.zIndex = '1000';
     });
 
     document.addEventListener('mouseup', () => {
@@ -369,6 +548,7 @@
         noteEl.style.left = '';
         noteEl.style.top = '';
         noteEl.style.width = '';
+        noteEl.style.zIndex = '';
       }
     });
   }
@@ -385,6 +565,16 @@
     state.notes.push(note);
     saveNotes();
     renderNotes();
+
+    // Focus on the new note
+    setTimeout(() => {
+      const newNoteEl = document.querySelector(`[data-id="${note.id}"] .note-content`);
+      if (newNoteEl) {
+        newNoteEl.focus();
+      }
+    }, 100);
+
+    showNotification('New note created!', 'success');
   }
 
   // Update note content
@@ -403,6 +593,7 @@
       note.color = color;
       saveNotes();
       renderNotes();
+      showNotification('Note color updated!', 'success');
     }
   }
 
@@ -411,6 +602,7 @@
     state.notes = state.notes.filter(n => n.id !== id);
     saveNotes();
     renderNotes();
+    showNotification('Note deleted', 'info');
   }
 
   // Save notes to localStorage
@@ -421,6 +613,8 @@
   // Render notes
   function renderNotes() {
     const container = document.getElementById('notes-container');
+    if (!container) return;
+
     container.innerHTML = '';
 
     state.notes.forEach(note => {
@@ -435,7 +629,8 @@
     state.notes = saved || [];
     renderNotes();
 
-    document.getElementById('add-note-btn').addEventListener('click', addNote);
+    const addNoteBtn = document.getElementById('add-note-btn');
+    if (addNoteBtn) addNoteBtn.addEventListener('click', addNote);
   }
 
   // ============================================
@@ -471,6 +666,9 @@
     li.appendChild(badge);
     li.appendChild(deleteBtn);
 
+    // Add stagger animation
+    li.style.animationDelay = `${state.todos.indexOf(todo) * 0.05}s`;
+
     return li;
   }
 
@@ -489,6 +687,8 @@
     state.todos.push(todo);
     saveTodos();
     renderTodos();
+
+    showNotification('Task added!', 'success');
   }
 
   // Toggle todo completion
@@ -496,6 +696,14 @@
     const todo = state.todos.find(t => t.id === id);
     if (todo) {
       todo.completed = !todo.completed;
+
+      if (todo.completed) {
+        state.stats.totalTasksCompleted++;
+        saveStats();
+        playSuccessSound();
+        showNotification('Task completed! 🎉', 'success');
+      }
+
       saveTodos();
       renderTodos();
     }
@@ -506,6 +714,7 @@
     state.todos = state.todos.filter(t => t.id !== id);
     saveTodos();
     renderTodos();
+    showNotification('Task deleted', 'info');
   }
 
   // Save todos to localStorage
@@ -516,6 +725,8 @@
   // Render todos
   function renderTodos() {
     const container = document.getElementById('todo-list');
+    if (!container) return;
+
     container.innerHTML = '';
 
     state.todos.forEach(todo => {
@@ -533,12 +744,14 @@
     const input = document.getElementById('todo-input');
     const prioritySelect = document.getElementById('priority-select');
 
-    input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        addTodo(input.value, prioritySelect.value);
-        input.value = '';
-      }
-    });
+    if (input) {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addTodo(input.value, prioritySelect ? prioritySelect.value : 'medium');
+          input.value = '';
+        }
+      });
+    }
   }
 
   // ============================================
@@ -598,7 +811,7 @@
     // Create 3 subtask checkboxes
     for (let i = 0; i < 3; i++) {
       const checkbox = document.createElement('div');
-      checkbox.className = `subtask-checkbox ${goal.subtasks[i] ? 'checked' : ''}`;
+      checkbox.className = `subtask-checkbox ${goal.subtasks && goal.subtasks[i] ? 'checked' : ''}`;
       checkbox.innerHTML = '<span class="checkmark">✓</span>';
       checkbox.addEventListener('click', () => {
         toggleGoalSubtask(goal.id, i);
@@ -622,6 +835,9 @@
     // Update progress ring
     updateGoalProgress(goalEl, goal.progress);
 
+    // Add animation delay
+    goalEl.style.animationDelay = `${state.goals.indexOf(goal) * 0.1}s`;
+
     return goalEl;
   }
 
@@ -629,11 +845,14 @@
   function updateGoalProgress(goalEl, progress) {
     const ringProgress = goalEl.querySelector('.goal-ring-progress');
     const progressText = goalEl.querySelector('.goal-ring-text');
-    const circumference = 2 * Math.PI * 22;
-    const offset = circumference * (1 - progress / 100);
 
-    ringProgress.style.strokeDashoffset = offset;
-    progressText.textContent = `${progress}%`;
+    if (ringProgress && progressText) {
+      const circumference = 2 * Math.PI * 22;
+      const offset = circumference * (1 - progress / 100);
+
+      ringProgress.style.strokeDashoffset = offset;
+      progressText.textContent = `${progress}%`;
+    }
   }
 
   // Calculate goal progress
@@ -659,6 +878,11 @@
       goal.progress = calculateGoalProgress(goal.subtasks);
       saveGoals();
       renderGoals();
+
+      if (goal.progress === 100) {
+        playSuccessSound();
+        showNotification('Goal completed! 🎯', 'success');
+      }
     }
   }
 
@@ -667,11 +891,15 @@
     state.goals = state.goals.filter(g => g.id !== id);
     saveGoals();
     renderGoals();
+    showNotification('Goal removed', 'info');
   }
 
   // Add new goal
   function addGoal() {
-    if (state.goals.length >= 3) return;
+    if (state.goals.length >= 3) {
+      showNotification('Maximum 3 goals allowed', 'error');
+      return;
+    }
 
     const goal = {
       id: generateId(),
@@ -684,6 +912,14 @@
     state.goals.push(goal);
     saveGoals();
     renderGoals();
+
+    // Focus on the new goal input
+    setTimeout(() => {
+      const newGoalInput = document.querySelector(`[data-id="${goal.id}"] .goal-input`);
+      if (newGoalInput) newGoalInput.focus();
+    }, 100);
+
+    showNotification('New goal added!', 'success');
   }
 
   // Save goals to localStorage
@@ -694,6 +930,8 @@
   // Render goals
   function renderGoals() {
     const container = document.getElementById('goals-container');
+    if (!container) return;
+
     container.innerHTML = '';
 
     state.goals.forEach(goal => {
@@ -710,13 +948,15 @@
         progress: 0
       };
       const goalEl = createGoalElement(emptyGoal);
-      goalEl.querySelector('.goal-input').placeholder = `Goal ${i + 1} (click to add)`;
-      goalEl.querySelector('.goal-input').addEventListener('focus', () => {
-        if (goalEl.querySelector('.goal-input').placeholder.includes('click to add')) {
+      const input = goalEl.querySelector('.goal-input');
+      if (input) {
+        input.placeholder = `Goal ${i + 1} (click to add)`;
+        input.readOnly = true;
+        input.style.cursor = 'pointer';
+        input.addEventListener('click', () => {
           addGoal();
-          renderGoals();
-        }
-      });
+        });
+      }
       container.appendChild(goalEl);
     }
   }
@@ -740,22 +980,46 @@
   }
 
   // ============================================
+  // Stats Management
+  // ============================================
+
+  // Save stats
+  function saveStats() {
+    // Reset daily stats if new day
+    const today = new Date().toDateString();
+    if (state.stats.lastSessionDate !== today) {
+      state.stats.sessionsToday = 0;
+      state.stats.lastSessionDate = today;
+    }
+    saveToStorage(STORAGE_KEYS.STATS, state.stats);
+  }
+
+  // Load stats
+  function loadStats() {
+    const saved = loadFromStorage(STORAGE_KEYS.STATS);
+    if (saved) {
+      state.stats = { ...state.stats, ...saved };
+
+      // Reset daily stats if new day
+      const today = new Date().toDateString();
+      if (state.stats.lastSessionDate !== today) {
+        state.stats.sessionsToday = 0;
+        state.stats.lastSessionDate = today;
+      }
+    }
+  }
+
+  // ============================================
   // Theme Switcher
   // ============================================
 
-  // Theme speed multipliers
-  const THEME_SPEEDS = {
-    focus: 1.2,
-    chill: 0.6,
-    energy: 1.8,
-    dark: 0.8
-  };
-
   // Set theme
   function setTheme(theme) {
-    document.body.className = document.body.className
-      .replace(/-theme/, '')
-      .replace('focus-active', '') + ` ${theme}-theme`;
+    // Remove existing theme classes
+    document.body.classList.remove('focus-theme', 'chill-theme', 'energy-theme', 'dark-theme');
+
+    // Add new theme class
+    document.body.classList.add(`${theme}-theme`);
 
     state.currentTheme = theme;
 
@@ -764,22 +1028,31 @@
       btn.classList.toggle('active', btn.dataset.theme === theme);
     });
 
-    // Update particle speed
-    if (window.ParticleEngine) {
-      window.ParticleEngine.updateSpeed(THEME_SPEEDS[theme] || 1);
+    // Update particle speed and hue
+    const config = THEME_CONFIG[theme];
+    if (config && window.ParticleEngine) {
+      window.ParticleEngine.updateSpeed(config.speed);
+      window.ParticleEngine.updateThemeHue(config.hue);
     }
+
+    // Save theme preference
+    saveToStorage(STORAGE_KEYS.SETTINGS, { theme });
   }
 
   // Initialize theme switcher
   function initThemeSwitcher() {
+    // Load saved theme
+    const settings = loadFromStorage(STORAGE_KEYS.SETTINGS);
+    const savedTheme = settings ? settings.theme : 'focus';
+
     document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         setTheme(btn.dataset.theme);
       });
     });
 
-    // Set default theme
-    setTheme('focus');
+    // Set initial theme
+    setTheme(savedTheme);
   }
 
   // ============================================
@@ -792,16 +1065,21 @@
 
     if (state.focusMode) {
       document.body.classList.add('focus-active');
-      document.getElementById('focus-toggle').classList.add('active');
+      const focusToggle = document.getElementById('focus-toggle');
+      if (focusToggle) focusToggle.classList.add('active');
     } else {
       document.body.classList.remove('focus-active');
-      document.getElementById('focus-toggle').classList.remove('active');
+      const focusToggle = document.getElementById('focus-toggle');
+      if (focusToggle) focusToggle.classList.remove('active');
     }
   }
 
   // Initialize focus mode
   function initFocusMode() {
-    document.getElementById('focus-toggle').addEventListener('click', toggleFocusMode);
+    const focusToggle = document.getElementById('focus-toggle');
+    if (focusToggle) {
+      focusToggle.addEventListener('click', toggleFocusMode);
+    }
   }
 
   // ============================================
@@ -817,6 +1095,7 @@
       // Esc still works in inputs
       if (e.key === 'Escape') {
         e.target.blur();
+        if (state.focusMode) toggleFocusMode();
       }
       return;
     }
@@ -836,8 +1115,10 @@
         e.preventDefault();
         if (state.timer.isRunning) {
           pauseTimer();
+          showNotification('Timer paused', 'info');
         } else {
           resumeTimer();
+          showNotification('Timer resumed', 'success');
         }
         break;
 
@@ -856,11 +1137,27 @@
   }
 
   // ============================================
+  // Page Load Animations
+  // ============================================
+
+  // Add entrance animations to widgets
+  function initPageAnimations() {
+    const widgets = document.querySelectorAll('.widget');
+    widgets.forEach((widget, index) => {
+      widget.style.animationDelay = `${index * 0.1}s`;
+    });
+  }
+
+  // ============================================
   // Initialization
   // ============================================
 
   // Initialize all components
   function init() {
+    // Add notification styles
+    addNotificationStyles();
+
+    // Initialize components
     initClock();
     initTimer();
     initNotes();
@@ -869,6 +1166,15 @@
     initThemeSwitcher();
     initFocusMode();
     initKeyboardShortcuts();
+    initPageAnimations();
+
+    // Load stats
+    loadStats();
+
+    // Welcome notification
+    setTimeout(() => {
+      showNotification('Welcome to ZenBoard! 🚀', 'success');
+    }, 500);
   }
 
   // Start app when DOM is ready
