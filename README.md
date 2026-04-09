@@ -128,10 +128,12 @@ All data is automatically saved to `localStorage`:
 
 ## Visual Enhancements (v2.0)
 
-### New Animations
+### UI Improvements & Animations
 - **Staggered widget entrance** — Widgets fade in sequentially on page load
 - **3D digit flip** — Clock numbers flip with perspective transform
 - **Breathing timer ring** — Expands/contracts with glow intensity
+- **Streamlined Goals Layout** — Responsive auto-filling horizontal grid for Daily Goals, maximizing screen space and reducing vertical scroll footprint.
+- **2-Column Notes Design** — Structured dual-column grid system for perfectly aligned workspaces alongside built-in introductory notes for newcomers.
 - **Note slide-in** — New notes slide from the left
 - **Todo slide-in** — Tasks animate from the left with stagger
 - **Goal fade-in** — Goals scale up smoothly

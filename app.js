@@ -661,7 +661,26 @@
   // Initialize notes
   function initNotes() {
     const saved = loadFromStorage(STORAGE_KEYS.NOTES);
-    state.notes = saved || [];
+    if (saved && saved.length > 0) {
+      state.notes = saved;
+    } else {
+      // Pre-built notes
+      state.notes = [
+        {
+          id: generateId(),
+          content: 'Welcome to ZenBoard! 🚀',
+          color: NOTE_COLORS[1],
+          createdAt: Date.now()
+        },
+        {
+          id: generateId(),
+          content: 'You can drag and drop these notes! ✨',
+          color: NOTE_COLORS[2],
+          createdAt: Date.now()
+        }
+      ];
+      saveNotes();
+    }
     renderNotes();
 
     const addNoteBtn = document.getElementById('add-note-btn');

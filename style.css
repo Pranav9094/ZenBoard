@@ -673,8 +673,9 @@ body.dark-theme {
   min-height: 300px;
   max-height: 450px;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
   gap: 12px;
   padding-right: 5px;
 }
@@ -1110,12 +1111,13 @@ body.dark-theme {
    ============================================ */
 
 .goals-widget {
-  grid-row: span 2;
+  grid-column: 1 / -1;
+  grid-row: auto;
 }
 
 .goals-container {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 15px;
 }
 
