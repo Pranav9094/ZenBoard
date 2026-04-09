@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZenBoard - Personal Productivity Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -90,11 +93,18 @@
                 </div>
             </div>
 
-            <!-- Todo List Widget -->
             <div class="widget todo-widget">
                 <div class="widget-header">
                     <h2>Tasks</h2>
+                    <div class="task-stats">
+                        <span id="completed-count">0</span>/<span id="total-count">0</span>
+                    </div>
                 </div>
+                
+                <div class="task-progress-container">
+                    <div class="task-progress-bar" id="task-progress-bar"></div>
+                </div>
+
                 <div class="todo-input-container">
                     <input type="text" class="todo-input" id="todo-input" placeholder="Add a task... (Enter to add)">
                     <select class="priority-select" id="priority-select">
@@ -103,9 +113,20 @@
                         <option value="high">High</option>
                     </select>
                 </div>
+
+                <div class="task-filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="active">Active</button>
+                    <button class="filter-btn" data-filter="completed">Done</button>
+                </div>
+
                 <ul class="todo-list" id="todo-list">
                     <!-- Todos will be dynamically inserted here -->
                 </ul>
+
+                <div class="task-footer">
+                    <button class="clear-btn" id="clear-completed">Clear Completed</button>
+                </div>
             </div>
 
             <!-- Daily Goals Widget -->

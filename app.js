@@ -61,6 +61,7 @@
     },
     focusMode: false,
     currentTheme: 'focus',
+    currentTaskFilter: 'all',
     stats: {
       totalTasksCompleted: 0,
       totalFocusTime: 0,
@@ -161,6 +162,30 @@
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.5);
+  }
+
+  // Create confetti effect
+  function triggerConfetti() {
+    const colors = ['#6c5ce7', '#00cec9', '#fd79a8', '#00b894', '#fdcb6e'];
+    for (let i = 0; i < 50; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      confetti.style.left = Math.random() * 100 + 'vw';
+      confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      confetti.style.width = Math.random() * 8 + 5 + 'px';
+      confetti.style.height = confetti.style.width;
+      confetti.style.opacity = Math.random();
+      confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      
+      const animationDuration = Math.random() * 2 + 1;
+      confetti.style.animation = `confetti-fall ${animationDuration}s linear forwards`;
+      
+      document.body.appendChild(confetti);
+      
+      setTimeout(() => {
+        confetti.remove();
+      }, animationDuration * 1000);
+    }
   }
 
   // ============================================
@@ -599,10 +624,20 @@
 
   // Delete note
   function deleteNote(id) {
-    state.notes = state.notes.filter(n => n.id !== id);
-    saveNotes();
-    renderNotes();
-    showNotification('Note deleted', 'info');
+    const noteEl = document.querySelector(`[data-id="${id}"]`);
+    if (noteEl) {
+      noteEl.classList.add('deleting');
+      setTimeout(() => {
+        state.notes = state.notes.filter(n => n.id !== id);
+        saveNotes();
+        renderNotes();
+        showNotification('Note deleted', 'info');
+      }, 300);
+    } else {
+      state.notes = state.notes.filter(n => n.id !== id);
+      saveNotes();
+      renderNotes();
+    }
   }
 
   // Save notes to localStorage
@@ -642,15 +677,26 @@
     const li = document.createElement('li');
     li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
     li.dataset.id = todo.id;
+    li.draggable = true;
 
     const checkbox = document.createElement('div');
     checkbox.className = 'todo-checkbox';
     checkbox.innerHTML = '<span class="checkmark">✓</span>';
-    checkbox.addEventListener('click', () => toggleTodo(todo.id));
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTodo(todo.id);
+    });
+
+    const textWrapper = document.createElement('div');
+    textWrapper.className = 'todo-text-wrapper';
+    textWrapper.style.flex = '1';
 
     const text = document.createElement('span');
     text.className = 'todo-text';
     text.textContent = todo.text;
+    text.addEventListener('dblclick', () => {
+      enterEditMode(li, todo);
+    });
 
     const badge = document.createElement('span');
     badge.className = `priority-badge ${todo.priority}`;
@@ -659,17 +705,91 @@
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'todo-delete-btn';
     deleteBtn.textContent = '×';
-    deleteBtn.addEventListener('click', () => deleteTodo(todo.id));
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteTodo(todo.id);
+    });
 
     li.appendChild(checkbox);
     li.appendChild(text);
     li.appendChild(badge);
     li.appendChild(deleteBtn);
 
+    // Drag events
+    li.addEventListener('dragstart', handleDragStart);
+    li.addEventListener('dragover', handleDragOver);
+    li.addEventListener('drop', handleDrop);
+    li.addEventListener('dragend', handleDragEnd);
+
     // Add stagger animation
     li.style.animationDelay = `${state.todos.indexOf(todo) * 0.05}s`;
 
     return li;
+  }
+
+  // Edit Mode Logic
+  function enterEditMode(li, todo) {
+    if (li.classList.contains('editing')) return;
+    
+    li.classList.add('editing');
+    const textSpan = li.querySelector('.todo-text');
+    const originalText = textSpan.textContent;
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'edit-input';
+    input.value = originalText;
+    
+    textSpan.replaceWith(input);
+    input.focus();
+    
+    const finishEdit = () => {
+      const newText = input.value.trim();
+      if (newText && newText !== originalText) {
+        todo.text = newText;
+        saveTodos();
+      }
+      renderTodos();
+    };
+    
+    input.addEventListener('blur', finishEdit);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') finishEdit();
+    });
+  }
+
+  // Drag and Drop Logic
+  let draggedItemId = null;
+
+  function handleDragStart(e) {
+    draggedItemId = this.dataset.id;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    const targetId = this.dataset.id;
+    if (draggedItemId === targetId) return;
+
+    const fromIndex = state.todos.findIndex(t => t.id === draggedItemId);
+    const toIndex = state.todos.findIndex(t => t.id === targetId);
+
+    const [movedTodo] = state.todos.splice(fromIndex, 1);
+    state.todos.splice(toIndex, 0, movedTodo);
+
+    saveTodos();
+    renderTodos();
+  }
+
+  function handleDragEnd() {
+    this.classList.remove('dragging');
+    draggedItemId = null;
   }
 
   // Add new todo
@@ -701,6 +821,7 @@
         state.stats.totalTasksCompleted++;
         saveStats();
         playSuccessSound();
+        triggerConfetti();
         showNotification('Task completed! 🎉', 'success');
       }
 
@@ -725,14 +846,35 @@
   // Render todos
   function renderTodos() {
     const container = document.getElementById('todo-list');
+    const progressBar = document.getElementById('task-progress-bar');
+    const compCountEl = document.getElementById('completed-count');
+    const totalCountEl = document.getElementById('total-count');
+    
     if (!container) return;
 
     container.innerHTML = '';
 
-    state.todos.forEach(todo => {
+    // Filter todos
+    let filteredTodos = state.todos;
+    if (state.currentTaskFilter === 'active') {
+      filteredTodos = state.todos.filter(t => !t.completed);
+    } else if (state.currentTaskFilter === 'completed') {
+      filteredTodos = state.todos.filter(t => t.completed);
+    }
+
+    filteredTodos.forEach(todo => {
       const todoEl = createTodoElement(todo);
       container.appendChild(todoEl);
     });
+
+    // Update progress
+    const total = state.todos.length;
+    const completed = state.todos.filter(t => t.completed).length;
+    const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (compCountEl) compCountEl.textContent = completed;
+    if (totalCountEl) totalCountEl.textContent = total;
   }
 
   // Initialize todos
@@ -916,7 +1058,10 @@
     // Focus on the new goal input
     setTimeout(() => {
       const newGoalInput = document.querySelector(`[data-id="${goal.id}"] .goal-input`);
-      if (newGoalInput) newGoalInput.focus();
+      if (newGoalInput) {
+        newGoalInput.readOnly = false; // Ensure it's not read-only
+        newGoalInput.focus();
+      }
     }, 100);
 
     showNotification('New goal added!', 'success');
@@ -949,14 +1094,23 @@
       };
       const goalEl = createGoalElement(emptyGoal);
       const input = goalEl.querySelector('.goal-input');
+      const progressRing = goalEl.querySelector('.goal-progress-ring');
+      
+      const onPlaceholderClick = (e) => {
+        e.stopPropagation();
+        addGoal();
+      };
+
       if (input) {
         input.placeholder = `Goal ${i + 1} (click to add)`;
         input.readOnly = true;
         input.style.cursor = 'pointer';
-        input.addEventListener('click', () => {
-          addGoal();
-        });
+        input.addEventListener('click', onPlaceholderClick);
       }
+      
+      goalEl.addEventListener('click', onPlaceholderClick);
+      goalEl.style.cursor = 'pointer';
+      
       container.appendChild(goalEl);
     }
   }
@@ -1102,23 +1256,28 @@
 
     switch (e.key.toLowerCase()) {
       case 'f':
+        if (e.ctrlKey || e.metaKey) return; // Allow browser search
         e.preventDefault();
         toggleFocusMode();
         break;
 
       case 'n':
+        if (e.ctrlKey || e.metaKey) return; // Allow browser new window
         e.preventDefault();
         addNote();
         break;
 
       case ' ':
-        e.preventDefault();
-        if (state.timer.isRunning) {
-          pauseTimer();
-          showNotification('Timer paused', 'info');
-        } else {
-          resumeTimer();
-          showNotification('Timer resumed', 'success');
+        // Only trigger if not in a button or focused element
+        if (e.target === document.body) {
+          e.preventDefault();
+          if (state.timer.isRunning) {
+            pauseTimer();
+            showNotification('Timer paused', 'info');
+          } else {
+            resumeTimer();
+            showNotification('Timer resumed', 'success');
+          }
         }
         break;
 
@@ -1167,6 +1326,8 @@
     initFocusMode();
     initKeyboardShortcuts();
     initPageAnimations();
+    initTaskFilters();
+    initDragTilt();
 
     // Load stats
     loadStats();
@@ -1175,6 +1336,55 @@
     setTimeout(() => {
       showNotification('Welcome to ZenBoard! 🚀', 'success');
     }, 500);
+  }
+
+  // Task Filter Initialization
+  function initTaskFilters() {
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    const clearBtn = document.getElementById('clear-completed');
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.currentTaskFilter = btn.dataset.filter;
+        renderTodos();
+      });
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        state.todos = state.todos.filter(t => !t.completed);
+        saveTodos();
+        renderTodos();
+        showNotification('Cleared completed tasks', 'info');
+      });
+    }
+  }
+
+  // 3D Tilt Effect Initialization
+  function initDragTilt() {
+    const widgets = document.querySelectorAll('.widget');
+    
+    widgets.forEach(widget => {
+      widget.addEventListener('mousemove', (e) => {
+        const rect = widget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        const rotateX = (y - centerY) / 25; // Less aggressive
+        const rotateY = (centerX - x) / 25;
+        
+        widget.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px) scale(1.01)`;
+      });
+      
+      widget.addEventListener('mouseleave', () => {
+        widget.style.transform = '';
+      });
+    });
   }
 
   // Start app when DOM is ready
